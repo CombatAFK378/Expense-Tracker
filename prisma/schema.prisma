@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  // Who gets the nightly 12 AM IST summary by email (null = use the account email)
+  reportEmail      String?
+  // Nightly summary pushed to Telegram (primary channel)
+  telegramChatId   String?
+  telegramLinkCode String?
+  createdAt    DateTime  @default(now())
+  expenses     Expense[]
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Amount stored as integer paise (₹120.50 = 12050). Never floats for money.
+  paise     Int
+  name      String
+  category  String   @default("Other")
+  // When the payment happened (IST day bucketing everywhere)
+  spentAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, spentAt])
+}
