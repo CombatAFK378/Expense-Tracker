@@ -21,3 +21,18 @@ select,
 textarea {
   color-scheme: dark;
 }
+
+@keyframes et-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-in {
+  animation: et-toast-in 200ms ease-out;
+}

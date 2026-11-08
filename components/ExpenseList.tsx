@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRupees, toLocalInput } from "@/lib/format";
 import { istYMD, shiftYMD } from "@/lib/time";
@@ -53,12 +53,27 @@ export default function ExpenseList({
   categories: string[];
 }) {
   const router = useRouter();
+  const [rowsState, setRowsState] = useState<ExpenseRowData[]>(rows);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  // Server refresh lands authoritative rows.
+  useEffect(() => setRowsState(rows), [rows]);
+
+  // Optimistic add from QuickAdd: appears instantly, before the server roundtrip.
+  useEffect(() => {
+    function onAdd(e: Event) {
+      const row = (e as CustomEvent<ExpenseRowData>).detail;
+      if (row) setRowsState((prev) => [row, ...prev].slice(0, 30));
+    }
+    window.addEventListener("et:expense-added", onAdd);
+    return () => window.removeEventListener("et:expense-added", onAdd);
+  }, []);
+
   async function del(id: number) {
     if (!confirm("Delete this expense?")) return;
+    setRowsState((prev) => prev.filter((r) => r.id !== id)); // instant local removal
     setBusyId(id);
     try {
       const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
@@ -66,13 +81,13 @@ export default function ExpenseList({
         const data = await res.json().catch(() => ({}));
         setError((data as { error?: string }).error ?? "Delete failed");
       }
-      router.refresh();
+      void router.refresh();
     } finally {
       setBusyId(null);
     }
   }
 
-  if (rows.length === 0) {
+  if (rowsState.length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 text-center text-sm text-zinc-500">
         Nothing logged yet — add your first payment 👆
@@ -87,7 +102,7 @@ export default function ExpenseList({
       </h2>
       {error && <p className="px-4 pt-2 text-xs text-red-400">{error}</p>}
       <ul className="divide-y divide-zinc-800/60">
-        {rows.map((row) => (
+        {rowsState.map((row) => (
           <li key={row.id} className="px-4 py-3.5">
             {editingId === row.id ? (
               <EditRow
@@ -97,7 +112,7 @@ export default function ExpenseList({
                 onCancel={() => setEditingId(null)}
                 onDone={() => {
                   setEditingId(null);
-                  router.refresh();
+                  void router.refresh();
                 }}
                 onError={(msg) => setError(msg)}
               />
@@ -112,12 +127,12 @@ export default function ExpenseList({
                     </span>
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold text-zinc-100">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-zinc-100">
                   {formatRupees(row.paise)}
                 </p>
                 <button
                   onClick={() => setEditingId(row.id)}
-                  className="text-xs text-zinc-600 transition-colors hover:text-zinc-300"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
                   aria-label="Edit"
                 >
                   ✏️
@@ -125,7 +140,7 @@ export default function ExpenseList({
                 <button
                   onClick={() => del(row.id)}
                   disabled={busyId === row.id}
-                  className="text-xs text-zinc-600 transition-colors hover:text-red-400 disabled:opacity-40"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40"
                   aria-label="Delete"
                 >
                   🗑️
@@ -199,7 +214,7 @@ export function EditRow({
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
+          className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-2.5 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
         >
           {categories.map((c) => (
             <option key={c} value={c}>
@@ -215,13 +230,13 @@ export function EditRow({
         />
       </div>
       <div className="mt-2 flex justify-end gap-2">
-        <button onClick={onCancel} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-300">
+        <button onClick={onCancel} className="rounded-lg px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300">
           Cancel
         </button>
         <button
           onClick={save}
           disabled={busy}
-          className="rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-bold text-zinc-950 disabled:opacity-50"
+          className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-zinc-950 disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save"}
         </button>

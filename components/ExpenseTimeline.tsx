@@ -80,12 +80,11 @@ export default function ExpenseTimeline({
                           onCancel={() => setEditingId(null)}
                           onDone={() => {
                             setEditingId(null);
-                            router.refresh();
+                            void router.refresh();
                           }}
                           onError={(msg) => setError(msg)}
                         />
-                      ) : null}
-                      {editingId !== row.id && (
+                      ) : (
                         <div className="flex items-center gap-3">
                           <span className="w-20 shrink-0 text-xs text-zinc-500">
                             {timeOf(row.spentAt)}

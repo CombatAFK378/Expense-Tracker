@@ -63,9 +63,17 @@ export async function GET(req: NextRequest) {
   // yesterday in IST terms right at midnight.
   const day = shiftYMD(istYMD(), -1);
 
-  const users = await prisma.user.findMany({
-    select: { id: true, email: true, reportEmail: true, telegramChatId: true },
-  });
+  let users: { id: number; email: string; reportEmail: string | null; telegramChatId: string | null }[] = [];
+  try {
+    users = await prisma.user.findMany({
+      select: { id: true, email: true, reportEmail: true, telegramChatId: true },
+    });
+  } catch (e) {
+    return Response.json(
+      { error: `Database unreachable (Aiven maintenance?) — ${(e as Error).message}` },
+      { status: 503 }
+    );
+  }
 
   let mailed = 0;
   let messaged = 0;

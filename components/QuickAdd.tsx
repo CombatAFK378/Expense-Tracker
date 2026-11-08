@@ -6,16 +6,12 @@ import { guessCategory } from "@/lib/categories";
 import { formatRupees, toLocalInput } from "@/lib/format";
 import { parseEntry } from "@/lib/parse";
 
-export default function QuickAdd({
-  categories,
-  initialCategory,
-}: {
-  categories: string[];
-  initialCategory: string;
-}) {
+const LAST_CAT_KEY = "et_last_category";
+
+export default function QuickAdd({ categories }: { categories: string[] }) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [category, setCategory] = useState(initialCategory);
+  const [category, setCategory] = useState("Other");
   const [catTouched, setCatTouched] = useState(false);
   const [dateMode, setDateMode] = useState<"now" | "custom">("now");
   const [dateLocal, setDateLocal] = useState("");
@@ -25,14 +21,18 @@ export default function QuickAdd({
 
   const parsed = useMemo(() => parseEntry(text), [text]);
 
-  // Follow the server-side "last used category" until the user overrides it.
+  // Last-used category: device-local, instant, no DB query needed.
   useEffect(() => {
-    if (!catTouched) {
-      setCategory(
-        parsed.hasAmount && parsed.name ? guessCategory(parsed.name) : initialCategory
-      );
+    const savedCat = window.localStorage.getItem(LAST_CAT_KEY);
+    if (savedCat && categories.includes(savedCat)) setCategory(savedCat);
+  }, [categories]);
+
+  // While typing, follow the guessed category unless the user overrode it.
+  useEffect(() => {
+    if (!catTouched && parsed.hasAmount && parsed.name) {
+      setCategory(guessCategory(parsed.name));
     }
-  }, [parsed, initialCategory, catTouched]);
+  }, [parsed, catTouched]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -47,8 +47,17 @@ export default function QuickAdd({
       return;
     }
     setBusy(true);
+
+    const spentAt = dateMode === "custom" && dateLocal ? new Date(dateLocal) : new Date();
+    const optimisticRow = {
+      id: -Date.now(),
+      name: parsed.name,
+      category,
+      paise: parsed.paise,
+      spentAt: spentAt.toISOString(),
+    };
+
     try {
-      const spentAt = dateMode === "custom" && dateLocal ? new Date(dateLocal) : new Date();
       const res = await fetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -64,23 +73,25 @@ export default function QuickAdd({
         setError(data.error ?? "Could not save the expense");
         return;
       }
+
+      window.localStorage.setItem(LAST_CAT_KEY, category);
+      window.dispatchEvent(new CustomEvent("et:expense-added", { detail: optimisticRow }));
+
       setText("");
       setDateMode("now");
       setSaved(true);
-      router.refresh();
+      // Server reconciliation in the background — no blocking roundtrip for the user.
+      void router.refresh();
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
-    >
+    <form onSubmit={submit} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-zinc-200">Add expense</h2>
-        {saved && <span className="text-xs font-medium text-emerald-400">Saved ✓</span>}
+        {saved && <span className="toast-in text-xs font-semibold text-emerald-400">Saved ✓</span>}
       </div>
 
       <input
@@ -97,7 +108,7 @@ export default function QuickAdd({
       <div className="mt-3 flex items-center gap-2.5">
         <span
           className={
-            "min-w-24 text-right text-2xl font-bold tracking-tight " +
+            "min-w-24 text-right text-2xl font-bold tabular-nums tracking-tight " +
             (parsed.hasAmount ? "text-emerald-300" : "text-zinc-700")
           }
         >
@@ -112,7 +123,7 @@ export default function QuickAdd({
             setCategory(e.target.value);
             setCatTouched(true);
           }}
-          className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2.5 py-2 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
+          className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2.5 py-2.5 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
         >
           {categories.map((c) => (
             <option key={c} value={c}>
@@ -130,7 +141,7 @@ export default function QuickAdd({
             setDateLocal("");
           }}
           className={
-            "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors " +
+            "min-h-9 rounded-lg px-3 py-2 text-xs font-semibold transition-colors " +
             (dateMode === "now"
               ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
               : "border border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:text-zinc-200")
@@ -145,7 +156,7 @@ export default function QuickAdd({
             setDateMode("custom");
           }}
           className={
-            "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors " +
+            "min-h-9 rounded-lg px-3 py-2 text-xs font-semibold transition-colors " +
             (dateMode === "custom"
               ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
               : "border border-zinc-800 bg-zinc-950/70 text-zinc-400 hover:text-zinc-200")
@@ -158,7 +169,7 @@ export default function QuickAdd({
             type="datetime-local"
             value={dateLocal}
             onChange={(e) => setDateLocal(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2.5 py-2 text-xs text-zinc-300 focus:border-emerald-500/60 focus:outline-none"
           />
         )}
       </div>
@@ -168,7 +179,7 @@ export default function QuickAdd({
       <button
         type="submit"
         disabled={busy}
-        className="mt-4 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-zinc-950 transition-colors hover:bg-emerald-400 disabled:opacity-50"
+        className="mt-4 min-h-11 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-zinc-950 transition-all hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-50"
       >
         {busy ? "Saving…" : "Add expense"}
       </button>
