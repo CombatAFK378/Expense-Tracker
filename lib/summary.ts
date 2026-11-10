@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { dayBounds, monthStartYMD, nextMonthStartYMD, shiftYMD } from "./time";
+import { dayBounds, istYMD, monthStartYMD, nextMonthStartYMD, shiftYMD } from "./time";
 
 export type DaySummary = {
   day: string;
@@ -10,6 +10,12 @@ export type DaySummary = {
   monthCount: number;
   byCategory: { category: string; paise: number }[];
   topExpense: { name: string; paise: number } | null;
+  // Dashboard extras — all derived from the same single month-range query.
+  monthDaysElapsed: number;
+  monthDaysTotal: number;
+  dailyAvgPaise: number;
+  projectedMonthPaise: number;
+  last7: { ymd: string; paise: number }[];
 };
 
 /**
@@ -35,6 +41,7 @@ export async function getSummary(userId: number, ymd: string): Promise<DaySummar
   let monthTotalPaise = 0;
   let monthCount = 0;
   const catTotals = new Map<string, number>();
+  const byDay = new Map<string, number>();
   let topExpense: { name: string; paise: number } | null = null;
 
   for (const row of rows) {
@@ -52,11 +59,22 @@ export async function getSummary(userId: number, ymd: string): Promise<DaySummar
       }
     }
     if (isYesterday) yesterdayPaise += row.paise;
+    const k = istYMD(row.spentAt);
+    byDay.set(k, (byDay.get(k) ?? 0) + row.paise);
   }
 
   const byCategory = [...catTotals.entries()]
     .map(([category, p]) => ({ category, paise: p }))
     .sort((a, b) => b.paise - a.paise);
+
+  const monthDaysElapsed = Number(ymd.slice(8, 10));
+  const monthDaysTotal = Number(shiftYMD(nextMonthStartYMD(ymd), -1).slice(8, 10));
+  const dailyAvgPaise = monthDaysElapsed > 0 ? Math.round(monthTotalPaise / monthDaysElapsed) : 0;
+  const projectedMonthPaise = dailyAvgPaise * monthDaysTotal;
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = shiftYMD(ymd, i - 6);
+    return { ymd: d, paise: byDay.get(d) ?? 0 };
+  });
 
   return {
     day: ymd,
@@ -67,5 +85,10 @@ export async function getSummary(userId: number, ymd: string): Promise<DaySummar
     monthCount,
     byCategory,
     topExpense,
+    monthDaysElapsed,
+    monthDaysTotal,
+    dailyAvgPaise,
+    projectedMonthPaise,
+    last7,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { categoryMeta } from "@/lib/categories";
 import { formatRupees, toLocalInput } from "@/lib/format";
 import { istYMD, shiftYMD } from "@/lib/time";
 import { parseEntry } from "@/lib/parse";
@@ -58,10 +59,8 @@ export default function ExpenseList({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  // Server refresh lands authoritative rows.
   useEffect(() => setRowsState(rows), [rows]);
 
-  // Optimistic add from QuickAdd: appears instantly, before the server roundtrip.
   useEffect(() => {
     function onAdd(e: Event) {
       const row = (e as CustomEvent<ExpenseRowData>).detail;
@@ -73,7 +72,7 @@ export default function ExpenseList({
 
   async function del(id: number) {
     if (!confirm("Delete this expense?")) return;
-    setRowsState((prev) => prev.filter((r) => r.id !== id)); // instant local removal
+    setRowsState((prev) => prev.filter((r) => r.id !== id));
     setBusyId(id);
     try {
       const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
@@ -89,66 +88,79 @@ export default function ExpenseList({
 
   if (rowsState.length === 0) {
     return (
-      <section className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 text-center text-sm text-zinc-500">
-        Nothing logged yet — add your first payment 👆
+      <section className="animate-fade-up rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/30 p-10 text-center">
+        <p className="text-3xl">🧾</p>
+        <p className="mt-3 text-sm text-zinc-400">Nothing logged yet</p>
+        <p className="mt-1 text-xs text-zinc-600">Your payments will show up here</p>
       </section>
     );
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-      <h2 className="border-b border-zinc-800/80 px-4 py-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-        Recent expenses
-      </h2>
+    <section className="animate-fade-up overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/70 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+          Recent expenses
+        </h2>
+        <span className="rounded-full bg-zinc-800/80 px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
+          {rowsState.length}
+        </span>
+      </div>
       {error && <p className="px-4 pt-2 text-xs text-red-400">{error}</p>}
-      <ul className="divide-y divide-zinc-800/60">
-        {rowsState.map((row) => (
-          <li key={row.id} className="px-4 py-3.5">
-            {editingId === row.id ? (
-              <EditRow
-                row={row}
-                categories={categories}
-                busy={busyId === row.id}
-                onCancel={() => setEditingId(null)}
-                onDone={() => {
-                  setEditingId(null);
-                  void router.refresh();
-                }}
-                onError={(msg) => setError(msg)}
-              />
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-zinc-100">{row.name}</p>
-                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-                    <span>{dayLabel(row.spentAt)}</span>
-                    <span className="rounded-md bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                      {row.category}
-                    </span>
+      <ul className="divide-y divide-zinc-800/50">
+        {rowsState.map((row) => {
+          const meta = categoryMeta(row.category);
+          return (
+            <li key={row.id} className="px-4 py-3 transition-colors hover:bg-zinc-800/20">
+              {editingId === row.id ? (
+                <EditRow
+                  row={row}
+                  categories={categories}
+                  busy={busyId === row.id}
+                  onCancel={() => setEditingId(null)}
+                  onDone={() => {
+                    setEditingId(null);
+                    void router.refresh();
+                  }}
+                  onError={(msg) => setError(msg)}
+                />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base ${meta.bg}`}
+                  >
+                    {meta.emoji}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-zinc-100">{row.name}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+                      <span>{dayLabel(row.spentAt)}</span>
+                      <span className={meta.color}>· {row.category}</span>
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold tabular-nums text-zinc-100">
+                    {formatRupees(row.paise)}
                   </p>
+                  <button
+                    onClick={() => setEditingId(row.id)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                    aria-label="Edit"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => del(row.id)}
+                    disabled={busyId === row.id}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40"
+                    aria-label="Delete"
+                  >
+                    🗑️
+                  </button>
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-zinc-100">
-                  {formatRupees(row.paise)}
-                </p>
-                <button
-                  onClick={() => setEditingId(row.id)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                  aria-label="Edit"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => del(row.id)}
-                  disabled={busyId === row.id}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40"
-                  aria-label="Delete"
-                >
-                  🗑️
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -203,12 +215,12 @@ export function EditRow({
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-3">
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="swiggy lunch 120"
-        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500/60 focus:outline-none"
+        className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 focus:border-emerald-500/60 focus:outline-none"
       />
       <div className="mt-2 flex gap-2">
         <select
@@ -236,7 +248,7 @@ export function EditRow({
         <button
           onClick={save}
           disabled={busy}
-          className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-zinc-950 disabled:opacity-50"
+          className="rounded-lg bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-2 text-xs font-bold text-zinc-950 disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save"}
         </button>

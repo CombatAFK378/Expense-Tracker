@@ -33,5 +33,5 @@ model Expense {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([userId, spentAt])
+  @@index([userId, spentAt(sort: Desc)])
 }

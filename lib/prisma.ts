@@ -16,6 +16,9 @@ const adapter = new PrismaPg({
     return url.replace(/[?&]connection_limit=\d+/g, "");
   })(),
   max: 4,
+  keepAlive: true,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
 
 const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });

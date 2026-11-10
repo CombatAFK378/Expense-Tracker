@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EditRow, type ExpenseRowData } from "./ExpenseList";
+import { categoryMeta } from "@/lib/categories";
 import { formatRupees } from "@/lib/format";
 import { relativeDayPrefix, timeOf, type MonthGroup } from "@/lib/dates";
 
@@ -27,7 +28,7 @@ export default function ExpenseTimeline({
         const data = await res.json().catch(() => ({}));
         setError((data as { error?: string }).error ?? "Delete failed");
       }
-      router.refresh();
+      void router.refresh();
     } finally {
       setBusyId(null);
     }
@@ -35,8 +36,10 @@ export default function ExpenseTimeline({
 
   if (months.length === 0) {
     return (
-      <section className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/40 p-8 text-center text-sm text-zinc-500">
-        Nothing logged yet — your history will build up here month by month.
+      <section className="animate-fade-up rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/40 p-10 text-center">
+        <p className="text-3xl">🗓️</p>
+        <p className="mt-3 text-sm text-zinc-400">Nothing logged yet</p>
+        <p className="mt-1 text-xs text-zinc-600">Your history builds up here month by month</p>
       </section>
     );
   }
@@ -45,16 +48,21 @@ export default function ExpenseTimeline({
     <div>
       {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
       {months.map((m) => (
-        <section key={m.key} className="mb-9">
-          <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2.5">
+        <section key={m.key} className="mb-9 animate-fade-up">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <h2 className="text-lg font-semibold tracking-tight text-zinc-50">{m.label}</h2>
-            <p className="text-base font-bold text-emerald-300">{formatRupees(m.totalPaise)}</p>
+            <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-bold tabular-nums text-emerald-300">
+              {formatRupees(m.totalPaise)}
+            </span>
           </div>
 
           {m.days.map((d) => {
             const prefix = relativeDayPrefix(d.ymd);
             return (
-              <div key={d.ymd} className="mt-5">
+              <div
+                key={d.ymd}
+                className="mt-4 rounded-2xl border border-zinc-800/70 bg-zinc-900/40 p-4"
+              >
                 <div className="flex items-baseline justify-between">
                   <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
                     {d.label}
@@ -64,59 +72,63 @@ export default function ExpenseTimeline({
                       </span>
                     )}
                   </p>
-                  <p className="text-xs font-semibold text-zinc-400">
+                  <p className="text-xs font-semibold tabular-nums text-zinc-400">
                     {formatRupees(d.totalPaise)}
                   </p>
                 </div>
 
-                <ul className="mt-1 divide-y divide-zinc-800/60">
-                  {d.rows.map((row) => (
-                    <li key={row.id} className="py-3.5">
-                      {editingId === row.id ? (
-                        <EditRow
-                          row={row as ExpenseRowData}
-                          busy={busyId === row.id}
-                          categories={categories}
-                          onCancel={() => setEditingId(null)}
-                          onDone={() => {
-                            setEditingId(null);
-                            void router.refresh();
-                          }}
-                          onError={(msg) => setError(msg)}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <span className="w-20 shrink-0 text-xs text-zinc-500">
-                            {timeOf(row.spentAt)}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-zinc-100">{row.name}</p>
-                            <span className="mt-1 inline-block rounded-md bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                              {row.category}
+                <ul className="mt-1 divide-y divide-zinc-800/50">
+                  {d.rows.map((row) => {
+                    const meta = categoryMeta(row.category);
+                    return (
+                      <li key={row.id} className="py-3">
+                        {editingId === row.id ? (
+                          <EditRow
+                            row={row as ExpenseRowData}
+                            busy={busyId === row.id}
+                            categories={categories}
+                            onCancel={() => setEditingId(null)}
+                            onDone={() => {
+                              setEditingId(null);
+                              void router.refresh();
+                            }}
+                            onError={(msg) => setError(msg)}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <span className="w-16 shrink-0 text-xs tabular-nums text-zinc-500">
+                              {timeOf(row.spentAt)}
                             </span>
+                            <span className="shrink-0 text-base">{meta.emoji}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-zinc-100">
+                                {row.name}
+                              </p>
+                              <span className={`text-[11px] ${meta.color}`}>{row.category}</span>
+                            </div>
+                            <p className="shrink-0 text-sm font-semibold tabular-nums text-zinc-100">
+                              {formatRupees(row.paise)}
+                            </p>
+                            <button
+                              onClick={() => setEditingId(row.id)}
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                              aria-label="Edit"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => del(row.id)}
+                              disabled={busyId === row.id}
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40"
+                              aria-label="Delete"
+                            >
+                              🗑️
+                            </button>
                           </div>
-                          <p className="shrink-0 text-sm font-semibold text-zinc-100">
-                            {formatRupees(row.paise)}
-                          </p>
-                          <button
-                            onClick={() => setEditingId(row.id)}
-                            className="text-xs text-zinc-600 transition-colors hover:text-zinc-300"
-                            aria-label="Edit"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => del(row.id)}
-                            disabled={busyId === row.id}
-                            className="text-xs text-zinc-600 transition-colors hover:text-red-400 disabled:opacity-40"
-                            aria-label="Delete"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );

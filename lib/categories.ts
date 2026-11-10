@@ -80,3 +80,21 @@ export function guessCategory(name: string): string {
   }
   return "Other";
 }
+
+// Visual identity per category — used by the list, timeline and quick-add preview.
+export const CATEGORY_META: Record<string, { emoji: string; color: string; bg: string }> = {
+  Food: { emoji: "🍔", color: "text-orange-300", bg: "bg-orange-500/10 border-orange-500/25" },
+  Groceries: { emoji: "🛒", color: "text-lime-300", bg: "bg-lime-500/10 border-lime-500/25" },
+  Travel: { emoji: "🚗", color: "text-sky-300", bg: "bg-sky-500/10 border-sky-500/25" },
+  Shopping: { emoji: "🛍️", color: "text-pink-300", bg: "bg-pink-500/10 border-pink-500/25" },
+  Subscriptions: { emoji: "🎬", color: "text-violet-300", bg: "bg-violet-500/10 border-violet-500/25" },
+  Rent: { emoji: "🏠", color: "text-indigo-300", bg: "bg-indigo-500/10 border-indigo-500/25" },
+  Mobile: { emoji: "📱", color: "text-teal-300", bg: "bg-teal-500/10 border-teal-500/25" },
+  Health: { emoji: "💊", color: "text-rose-300", bg: "bg-rose-500/10 border-rose-500/25" },
+  Fun: { emoji: "🎮", color: "text-amber-300", bg: "bg-amber-500/10 border-amber-500/25" },
+  Other: { emoji: "📦", color: "text-zinc-300", bg: "bg-zinc-500/10 border-zinc-500/25" },
+};
+
+export function categoryMeta(category: string) {
+  return CATEGORY_META[category] ?? CATEGORY_META.Other;
+}

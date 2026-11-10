@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { guessCategory } from "@/lib/categories";
+import { categoryMeta, guessCategory } from "@/lib/categories";
 import { formatRupees, toLocalInput } from "@/lib/format";
 import { parseEntry } from "@/lib/parse";
 
@@ -20,14 +20,13 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
   const [saved, setSaved] = useState(false);
 
   const parsed = useMemo(() => parseEntry(text), [text]);
+  const meta = categoryMeta(category);
 
-  // Last-used category: device-local, instant, no DB query needed.
   useEffect(() => {
     const savedCat = window.localStorage.getItem(LAST_CAT_KEY);
     if (savedCat && categories.includes(savedCat)) setCategory(savedCat);
   }, [categories]);
 
-  // While typing, follow the guessed category unless the user overrode it.
   useEffect(() => {
     if (!catTouched && parsed.hasAmount && parsed.name) {
       setCategory(guessCategory(parsed.name));
@@ -80,7 +79,6 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
       setText("");
       setDateMode("now");
       setSaved(true);
-      // Server reconciliation in the background — no blocking roundtrip for the user.
       void router.refresh();
     } finally {
       setBusy(false);
@@ -88,7 +86,10 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+    <form
+      onSubmit={submit}
+      className="animate-fade-up rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 shadow-xl shadow-black/30 backdrop-blur"
+    >
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-zinc-200">Add expense</h2>
         {saved && <span className="toast-in text-xs font-semibold text-emerald-400">Saved ✓</span>}
@@ -101,7 +102,7 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
           setSaved(false);
         }}
         placeholder="swiggy lunch 120"
-        className="mt-3 w-full rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 py-3.5 text-lg font-medium tracking-wide text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+        className="mt-3 w-full rounded-2xl border border-zinc-800 bg-zinc-950/70 px-4 py-3.5 text-lg font-medium tracking-wide text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         autoComplete="off"
       />
 
@@ -116,6 +117,9 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-zinc-300">
           {parsed.name || <span className="text-zinc-600">what it was for…</span>}
+        </span>
+        <span className={`shrink-0 rounded-lg border px-1.5 py-1 text-sm ${meta.bg}`}>
+          {meta.emoji}
         </span>
         <select
           value={category}
@@ -179,7 +183,7 @@ export default function QuickAdd({ categories }: { categories: string[] }) {
       <button
         type="submit"
         disabled={busy}
-        className="mt-4 min-h-11 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-zinc-950 transition-all hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-50"
+        className="mt-4 min-h-11 w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-400 py-3 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition-all hover:from-emerald-300 hover:to-teal-300 active:scale-[0.98] disabled:opacity-50"
       >
         {busy ? "Saving…" : "Add expense"}
       </button>
